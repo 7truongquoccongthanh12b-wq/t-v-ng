@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Vocab Blitz — 3s Fixed Timeout (Complete)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg1:#ffffff; --bg2:#f5f7fb; --ink:#0f172a; --muted:#64748b;
+    --ok:#10b981; --bad:#ef4444; --warn:#f59e0b; --stroke:#e2e8f0; --primary:#2563eb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Arial,sans-serif;
+       color:var(--ink); background:linear-gradient(to bottom,var(--bg1),var(--bg2));}
+  header{position:sticky; top:0; backdrop-filter:saturate(1.2) blur(6px);
+         background-color:#ffffffcc; border-bottom:1px solid var(--stroke); z-index:10;}
+  .container{max-width:1000px; margin:0 auto; padding:12px 16px;}
+  .row{display:grid; grid-template-columns:1fr 340px; gap:16px;}
+  @media (max-width:960px){ .row{grid-template-columns:1fr} }
+  .card{background:#fff; border:1px solid var(--stroke); border-radius:12px; overflow:hidden}
+  .card .head{padding:12px 16px; border-bottom:1px solid var(--stroke); display:flex; align-items:center; justify-content:space-between;}
+  .bar{height:8px; background:#eef2ff}
+  .bar > div{height:100%; background:var(--warn); width:100%; transition:width .05s linear}
+  .pad{padding:18px}
+  .title{display:flex; align-items:center; gap:8px}
+  .pill{display:inline-flex; align-items:center; justify-content:center; height:24px; min-width:24px; padding:0 8px; border-radius:999px; background:#111827; color:#fff; font-weight:700; font-size:12px}
+  .btn{cursor:pointer; border:1px solid var(--stroke); background:#fff; color:var(--ink); padding:10px 14px; border-radius:10px; font-weight:600}
+  .btn:hover{background:#f8fafc}
+  .btn.primary{background:var(--primary); color:#fff; border-color:var(--primary)}
+  .btn.ghost{background:transparent}
+  .btn.success{background:var(--ok); color:#fff; border-color:var(--ok)}
+  .grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .opt{text-align:left; padding:12px 14px; border:1px solid var(--stroke); border-radius:12px; background:#fff; cursor:pointer}
+  .opt:hover{background:#f8fafc}
+  .opt.ok{border-color:var(--ok); background:#ecfdf5}
+  .opt.bad{border-color:var(--bad); background:#fef2f2}
+  .muted{color:var(--muted)}
+  .stats{display:flex; align-items:baseline; justify-content:space-between}
+  .stats .score{font-size:28px; font-weight:700}
+  .tiny{font-size:12px}
+  .tag{display:inline-block; padding:2px 8px; border:1px solid var(--stroke); border-radius:999px; color:var(--muted); font-size:12px}
+  .box{max-height:160px; overflow:auto; border:1px solid var(--stroke); border-radius:8px; padding:8px; white-space:pre-wrap}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+<header>
+  <div class="container" style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+    <div class="title">
+      <span class="pill">3s</span>
+      <strong>Vocab Blitz — Fixed Timeout</strong>
+      <span class="muted tiny">Đúng 3 giây/từ — không chọn = sai & chuyển ngay • Mỗi từ 1 lần/vòng</span>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+      <button class="btn" id="newRoundBtn">New Round (Shuffle)</button>
+      <button class="btn ghost" id="retryWrongBtn" title="Chỉ luyện lại các từ đã sai ở vòng vừa rồi">Luyện lại từ sai</button>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-top:20px; padding-bottom:28px">
+  <div class="row">
+    <!-- QUIZ CARD -->
+    <section class="card">
+      <div class="head">
+        <div class="muted tiny">Còn lại</div>
+        <div class="muted tiny" id="timeText">3.0s</div>
+      </div>
+      <div class="bar"><div id="barFill" style="width:100%"></div></div>
+      <div class="pad">
+        <div class="muted" style="text-transform:uppercase; letter-spacing:.08em">Chọn nghĩa tiếng Việt đúng</div>
+        <div id="word" style="font-size:34px; font-weight:800; margin-top:4px">—</div>
+
+        <div class="grid" id="options" style="margin-top:14px"></div>
+
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px" class="muted tiny">
+          <div id="statusArea"></div>
+          <button class="btn" id="skipBtn">Bỏ qua</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SIDE PANEL -->
+    <aside style="display:flex; flex-direction:column; gap:16px">
+      <!-- Score -->
+      <section class="card">
+        <div class="pad stats">
+          <div>
+            <div class="muted tiny">Điểm</div>
+            <div class="score" id="scoreText">0/0 <span class="muted" id="pctText">(0%)</span></div>
+          </div>
+          <div style="text-align:right">
+            <div class="muted tiny">Timer</div>
+            <div>3s / từ (khóa cứng)</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Import -->
+      <section class="card">
+        <div class="pad">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+            <strong>Nhập dữ liệu</strong>
+            <span class="tag">A=word • B=meaning (VI)</span>
+          </div>
+          <div style="height:8px"></div>
+          <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.tsv,.txt">
+          <label class="tiny" style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <input type="checkbox" id="replaceMode" checked>
+            Replace existing words (chỉ dùng dữ liệu file vừa nạp)
+          </label>
+          <div class="tiny muted" style="margin-top:6px">
+            Excel cần 2 cột: <b>word</b>, <b>meaning (tiếng Việt)</b>. Không tiêu đề cũng được.
+          </div>
+
+          <div style="height:12px"></div>
+          <button class="btn success" id="confirmImportBtn" disabled>✅ Dùng dữ liệu vừa import</button>
+          <div class="tiny muted" id="importInfo" style="margin-top:6px">Chưa có dữ liệu import để xác nhận.</div>
+
+          <div style="height:14px"></div>
+          <strong>Dán dữ liệu</strong>
+          <div style="height:6px"></div>
+          <textarea id="pasteBox" placeholder="Mỗi dòng một cặp, ví dụ:
+abandon - từ bỏ
+invoice: hoá đơn"></textarea>
+          <div style="height:8px"></div>
+          <button class="btn" id="usePaste">Dùng dữ liệu dán (Xác nhận ngay)</button>
+          <button class="btn ghost" id="loadSample">Tải bộ mẫu</button>
+
+          <div style="height:12px"></div>
+          <strong>Preview (5 dòng đầu)</strong>
+          <div id="previewBox" class="box tiny muted">No data</div>
+        </div>
+      </section>
+
+      <!-- Wrong list -->
+      <section class="card">
+        <div class="pad">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+            <strong>Sai trong vòng này</strong>
+            <div style="display:flex; gap:6px">
+              <button class="btn tiny" id="copyWrongBtn">Copy</button>
+              <button class="btn tiny" id="downloadWrongBtn">Download CSV</button>
+              <button class="btn ghost tiny" id="clearWrongBtn">Clear</button>
+            </div>
+          </div>
+          <div id="wrongBox" class="box tiny muted" style="margin-top:8px">Chưa có dữ liệu.</div>
+        </div>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<footer class="container tiny muted" style="padding-bottom:24px; text-align:center">
+  1 HTML file • ĐÚNG 3 GIÂY/ TỪ • Không chọn = sai & chuyển ngay • Mỗi từ 1 lần/vòng • Tổng kết từ sai • Excel (tuỳ chọn)
+</footer>
+
+<!-- XLSX (tùy chọn để đọc Excel). Nếu offline, phần import Excel sẽ ẩn và vẫn dùng paste/bộ mẫu. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="window.__XLSX_FAIL__=true;"></script>
+
+<script>
+/* ===== Fixed config ===== */
+const DURATION_MS = 3000; // KHÓA CỨNG 3 GIÂY
+const OPTION_REVEAL_DELAY_MS = 450; // nhá 1 nhịp khi người dùng chọn
+const LS_WORDS = "vocab_blitz_fixed_words_v3";
+
+const STARTER = [
+  { word: "abandon", meaning: "từ bỏ" },
+  { word: "accurate", meaning: "chính xác" },
+  { word: "benefit", meaning: "lợi ích" },
+  { word: "cautious", meaning: "thận trọng" },
+  { word: "decline", meaning: "suy giảm; từ chối" },
+  { word: "efficient", meaning: "hiệu quả (tối ưu nguồn lực)" },
+  { word: "fund", meaning: "quỹ; cấp vốn" },
+  { word: "generate", meaning: "tạo ra" },
+  { word: "hire", meaning: "thuê (nhân sự)" },
+  { word: "invoice", meaning: "hóa đơn" },
+];
+
+const FALLBACK_VN = [
+  "một nhiệm vụ thường lệ","một lỗi nhỏ","một sự kiện không liên quan","một sự cho phép tạm thời",
+  "một cuộc trò chuyện riêng tư","một thông báo công khai","một công cụ kỹ thuật","một vật dùng để trang trí"
+];
+
+const $ = (s)=>document.querySelector(s);
+const el = {
+  timeText: $("#timeText"), barFill: $("#barFill"),
+  word: $("#word"), options: $("#options"),
+  status: $("#statusArea"), score: $("#scoreText"), pct: $("#pctText"),
+  skip: $("#skipBtn"), newRoundBtn: $("#newRoundBtn"), retryWrongBtn: $("#retryWrongBtn"),
+  file: $("#fileInput"), paste: $("#pasteBox"), usePaste: $("#usePaste"), loadSample: $("#loadSample"),
+  replaceMode: $("#replaceMode"), preview: $("#previewBox"), confirmImport: $("#confirmImportBtn"),
+  importInfo: $("#importInfo"), wrongBox: $("#wrongBox"), copyWrongBtn: $("#copyWrongBtn"),
+  downloadWrongBtn: $("#downloadWrongBtn"), clearWrongBtn: $("#clearWrongBtn"),
+};
+
+function shuffle(a){ const x=[...a]; for (let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+
+function buildOptions(current, pool){
+  const other = pool.filter(w=>w.word!==current.word).map(w=>w.meaning);
+  const unique = Array.from(new Set(other));
+  const wrong = [];
+  while (wrong.length<3 && unique.length){
+    const idx = Math.floor(Math.random()*unique.length);
+    const [pick] = unique.splice(idx,1);
+    if (pick && pick!==current.meaning) wrong.push(pick);
+  }
+  while (wrong.length<3){
+    const f = FALLBACK_VN[Math.floor(Math.random()*FALLBACK_VN.length)];
+    if (!wrong.includes(f) && f!==current.meaning) wrong.push(f);
+  }
+  return shuffle([{text:current.meaning,correct:true}, ...wrong.map(t=>({text:t,correct:false}))]);
+}
+
+function loadWords(){
+  try{ const raw = localStorage.getItem(LS_WORDS); const arr = raw? JSON.parse(raw): null; return Array.isArray(arr)&&arr.length? arr: STARTER; }
+  catch{ return STARTER }
+}
+function saveWords(arr){ localStorage.setItem(LS_WORDS, JSON.stringify(arr)); }
+function mergeWords(list){
+  const map = new Map();
+  list.forEach(w => map.set(String(w.word).toLowerCase(), { word:String(w.word), meaning:String(w.meaning) }));
+  return Array.from(map.values());
+}
+
+/* ===== State ===== */
+let words = loadWords();
+let idx = 0, options = [], status="idle", score=0, total=0;
+let wrongThisRound = [];
+let roundFinished = false;
+let pendingWords = [], pendingMeta=null;
+
+/* ===== Timer (exact 3s) ===== */
+let tInterval = null, tStart = 0;
+function startTimer(){
+  stopTimer();
+  tStart = performance.now();
+  updateTimer();
+  tInterval = setInterval(updateTimer, 50);
+}
+function stopTimer(){ if (tInterval){ clearInterval(tInterval); tInterval=null; } }
+function updateTimer(){
+  if (status!=="idle" || roundFinished) return stopTimer();
+  const elapsed = performance.now() - tStart;
+  const remain = Math.max(0, DURATION_MS - elapsed);
+  el.timeText.textContent = (Math.ceil(remain/100)/10).toFixed(1) + "s";
+  el.barFill.style.width = (remain/DURATION_MS*100) + "%";
+  if (remain <= 0){
+    stopTimer();
+    status = "timeout";
+    total++;
+    wrongThisRound.push({ word: words[idx].word, meaning: words[idx].meaning, reason: "timeout" });
+    const btns = [...el.options.querySelectorAll("button")];
+    btns.forEach((b,k)=>{ if (options[k].correct) b.classList.add("ok"); b.disabled = true; });
+    el.status.textContent = "⏰ Hết giờ (tính sai)";
+    el.status.style.color = "var(--warn)";
+    renderScore();
+    advance(); // chuyển NGAY
+  }
+}
+
+/* ===== Render ===== */
+function renderScore(){
+  const pct = total ? Math.round(score/total*100) : 0;
+  el.score.innerHTML = `${score}/${total} <span class="muted" id="pctText">(${pct}%)</span>`;
+}
+function renderWrongBox(){
+  if (!wrongThisRound.length){ el.wrongBox.textContent = "Chưa có dữ liệu."; return; }
+  const lines = wrongThisRound.map((w,i)=> `${i+1}. ${w.word} — ${w.meaning}${w.reason==='timeout'?' (hết giờ)':''}`);
+  el.wrongBox.textContent = lines.join("\\n");
+}
+function renderPreview(arr){
+  if (!arr || !arr.length){ el.preview.textContent = "No data"; return; }
+  const lines = arr.slice(0,5).map((w,i)=> `${i+1}. ${w.word} — ${w.meaning}`);
+  el.preview.textContent = `Loaded: ${arr.length} mục\\n` + lines.join("\\n");
+}
+function renderEmpty(){
+  stopTimer();
+  el.word.textContent = "Chưa có dữ liệu — hãy Import Excel/CSV hoặc dán dữ liệu.";
+  el.options.innerHTML = "";
+  el.status.textContent = "";
+  el.timeText.textContent = "—";
+  el.barFill.style.width = "0%";
+}
+function renderQuestion(resetTimer){
+  if (!words.length || roundFinished){ renderEndState(); return; }
+  const current = words[idx];
+  el.word.textContent = current.word;
+  options = buildOptions(current, words);
+  el.options.innerHTML = "";
+  options.forEach((opt,i)=>{
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.textContent = opt.text;
+    b.onclick = ()=>onSelect(i);
+    el.options.appendChild(b);
+  });
+  status = "idle"; el.status.textContent = ""; el.status.style.color = "var(--muted)";
+  if (resetTimer) startTimer();
+}
+function renderEndState(){
+  el.timeText.textContent = "xong";
+  el.barFill.style.width = "0%";
+  el.status.textContent = "🎯 Đã hết từ — bấm “New Round (Shuffle)” hoặc “Luyện lại từ sai” để tiếp tục.";
+  el.status.style.color = "var(--muted)";
+}
+
+/* ===== Core flow ===== */
+function onSelect(i){
+  if (status!=="idle" || roundFinished) return;
+  stopTimer();
+  status = options[i].correct ? "correct" : "wrong";
+  total++;
+  if (status==="correct") score++; else wrongThisRound.push({ word: words[idx].word, meaning: words[idx].meaning, reason: "wrong" });
+
+  const btns = [...el.options.querySelectorAll("button")];
+  btns.forEach((b,k)=>{
+    if (options[k].correct) b.classList.add("ok");
+    if (k===i && !options[k].correct) b.classList.add("bad");
+    b.disabled = true;
+  });
+  el.status.textContent = status==="correct" ? "✔ Chính xác" : "✘ Sai";
+  el.status.style.color = status==="correct" ? "var(--ok)" : "var(--bad)";
+  renderScore();
+  setTimeout(()=>advance(), OPTION_REVEAL_DELAY_MS);
+}
+function advance(){
+  if (roundFinished) return;
+  if (idx >= words.length - 1){ finishRound(); return; }
+  idx++;
+  renderQuestion(true);
+}
+function finishRound(){
+  roundFinished = true;
+  stopTimer();
+  const btns = [...el.options.querySelectorAll("button")];
+  btns.forEach(b=>b.disabled=true);
+  renderWrongBox();
+  const uniq = new Set(wrongThisRound.map(w=>w.word.toLowerCase()));
+  alert(uniq.size ? `Kết thúc vòng! Bạn sai ${uniq.size} từ. Kiểm tra panel "Sai trong vòng này".`
+                  : "Kết thúc vòng! Bạn không sai từ nào. 🎉");
+  renderEndState();
+}
+
+/* ===== Round control ===== */
+function startNewRound(doShuffle){
+  if (doShuffle) words = shuffle(words);
+  saveWords(words);
+  idx = 0; score = 0; total = 0; wrongThisRound = []; roundFinished = false;
+  renderScore(); renderPreview(words); renderWrongBox();
+  if (!words.length){ renderEmpty(); return; }
+  renderQuestion(true);
+}
+function startWrongOnlyRound(){
+  const uniq = [];
+  const seen = new Set();
+  wrongThisRound.forEach(w => {
+    const k = String(w.word).toLowerCase();
+    if (!seen.has(k)){ seen.add(k); uniq.push({word:w.word, meaning:w.meaning}); }
+  });
+  if (!uniq.length){ alert("Không có từ sai để luyện lại."); return; }
+  words = shuffle(uniq);
+  saveWords(words);
+  idx = 0; score = 0; total = 0; wrongThisRound = []; roundFinished = false;
+  renderScore(); renderPreview(words); renderWrongBox();
+  renderQuestion(true);
+}
+
+/* ===== Import / Parse ===== */
+function onFileSelect(ev){
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+
+  pendingWords = []; pendingMeta = null;
+  el.confirmImport.disabled = true;
+  el.importInfo.textContent = "Đang đọc file…";
+
+  const useXLSX = (typeof XLSX !== "undefined") && !window.__XLSX_FAIL__;
+
+  if (['xlsx','xls','xlsm'].includes(ext)){
+    if (!useXLSX){
+      el.importInfo.textContent = "Không tải được thư viện Excel (CDN). Hãy bật Internet hoặc dùng CSV/TSV/TXT hay dán dữ liệu.";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = new Uint8Array(reader.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        let bestPairs = []; let bestSheet = '';
+        for (const name of wb.SheetNames){
+          const ws = wb.Sheets[name]; if (!ws) continue;
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+          const pairs = parseRowsToPairs(rows);
+          if (pairs.length > bestPairs.length){ bestPairs = pairs; bestSheet = name; }
+        }
+        if (!bestPairs.length){ el.importInfo.textContent = "Không thấy dữ liệu hợp lệ (cần 2 cột: word, meaning)."; return; }
+        pendingWords = bestPairs;
+        pendingMeta = { type:'excel', sheet: bestSheet, count: bestPairs.length, filename: f.name };
+        renderPendingPreview();
+        el.confirmImport.disabled = false;
+      } catch (e){
+        console.error(e);
+        el.importInfo.textContent = "Lỗi đọc Excel. Kiểm tra file có 2 cột: word, meaning (không merge).";
+      }
+    };
+    reader.readAsArrayBuffer(f);
+    return;
+  }
+
+  // CSV/TSV/TXT
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = String(reader.result||"");
+    const rows = text.split(/\\r?\\n/).map(l=>l.trim()).filter(Boolean).map(line=> line.split(/\\t|,|;|:/));
+    const pairs = parseRowsToPairs(rows);
+    if (!pairs.length){ el.importInfo.textContent = "Không đọc được dữ liệu. Cần 2 cột: word, meaning."; return; }
+    pendingWords = pairs;
+    pendingMeta = { type:'text', count: pairs.length, filename: f.name };
+    renderPendingPreview();
+    el.confirmImport.disabled = false;
+  };
+  reader.readAsText(f, "utf-8");
+}
+function renderPendingPreview(){
+  const count = pendingWords.length;
+  const info = pendingMeta?.type==='excel'
+    ? `Đã đọc từ Excel (${pendingMeta.filename}), sheet <${pendingMeta.sheet}>: ${count} dòng. Bấm "Dùng dữ liệu vừa import" để áp dụng.`
+    : `Đã đọc ${count} dòng từ ${pendingMeta?.filename||'văn bản'}. Bấm "Dùng dữ liệu vừa import" để áp dụng.`;
+  el.importInfo.textContent = info;
+  const lines = pendingWords.slice(0,5).map((w,i)=> `${i+1}. ${w.word} — ${w.meaning}`);
+  el.preview.textContent = `Pending: ${count} mục\\n` + lines.join("\\n");
+}
+function confirmUsePending(){
+  if (!pendingWords.length){ alert("Chưa có dữ liệu import để xác nhận."); return; }
+  applyImported(pendingWords, pendingMeta || {type:'unknown', count: pendingWords.length});
+  pendingWords = []; pendingMeta = null;
+  el.confirmImport.disabled = true;
+  el.importInfo.textContent = "Đã áp dụng dữ liệu import.";
+}
+function applyImported(arr, meta){
+  let newSet = Array.isArray(arr) ? arr : [];
+  if (!newSet.length){ alert("Dữ liệu rỗng."); return; }
+  const modeReplace = el.replaceMode ? el.replaceMode.checked : true;
+  words = modeReplace ? newSet : mergeWords([...words, ...newSet]);
+  if (words.length < 2) alert("Dữ liệu quá ít. Nên có ≥ 4 dòng để đa dạng đáp án.");
+  words = shuffle(words);
+  saveWords(words);
+  startNewRound(false);
+  const src = meta?.type==='excel'
+    ? `Excel sheet: ${meta.sheet} • ${meta.count} dòng`
+    : meta?.type==='text'
+      ? `Text/CSV: ${meta.count} dòng`
+      : `Imported: ${meta?.count||newSet.length} dòng`;
+  alert(`Đã áp dụng dữ liệu.\\n${src}`);
+}
+function parseRowsToPairs(rows){
+  const pairs = [];
+  if (!Array.isArray(rows)) return pairs;
+  const header = (rows[0]||[]).map(x => String(x||'').toLowerCase().trim());
+  const headerLooksLikeTitles = (header[0] && header[1]) && (/^(word|từ|tu|vocabulary)$/i.test(header[0]) || /^(meaning|nghĩa|nghia|definition)$/i.test(header[1]));
+  const startIdx = headerLooksLikeTitles ? 1 : 0;
+  for (let r = startIdx; r < rows.length; r++) {
+    const row = rows[r] || [];
+    const w = String((row[0] ?? '')).trim();
+    const m = String((row[1] ?? '')).trim();
+    if (!w || !m) continue;
+    pairs.push({ word: w, meaning: m });
+  }
+  return pairs;
+}
+
+/* ===== Wrong list helpers ===== */
+function wrongToCSV(){
+  const rows = [["word","meaning","reason"]];
+  const seen = new Set();
+  for (const w of wrongThisRound){
+    const k = (w.word+"|"+w.meaning).toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    rows.push([w.word, w.meaning, w.reason||"wrong"]);
+  }
+  return rows.map(r=>r.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(",")).join("\\r\\n");
+}
+function downloadWrongCSV(){
+  const csv = wrongToCSV();
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "wrong_words_round.csv";
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+async function copyWrongToClipboard(){
+  const lines = wrongThisRound.map(w=>`${w.word} — ${w.meaning}${w.reason==='timeout'?' (hết giờ)':''}`);
+  const text = lines.join("\\n");
+  try{ await navigator.clipboard.writeText(text||""); alert("Đã copy danh sách từ sai vào clipboard."); }
+  catch{ alert("Trình duyệt chặn copy. Hãy chọn & copy thủ công trong ô danh sách."); }
+}
+
+/* ===== UI init ===== */
+function initUI(){
+  el.skip.addEventListener("click", ()=>{ if(roundFinished) return; stopTimer(); status="skip"; total++; wrongThisRound.push({word:words[idx].word,meaning:words[idx].meaning,reason:"skip"}); renderScore(); advance(); });
+
+  el.newRoundBtn.addEventListener("click", ()=>startNewRound(true));
+  el.retryWrongBtn.addEventListener("click", startWrongOnlyRound);
+
+  el.file.addEventListener("change", onFileSelect);
+  el.confirmImport.addEventListener("click", confirmUsePending);
+
+  el.usePaste.addEventListener("click", ()=> {
+    const text = el.paste.value || "";
+    const lines = text.split(/\\r?\\n/).map(s=>s.trim()).filter(Boolean);
+    const pairs = [];
+    for (const line of lines){
+      const m = line.match(/^([^:\\-\\t]+)[:\\-\\t]+(.+)$/);
+      if (m){ const w=m[1].trim(), mean=m[2].trim(); if (w && mean) pairs.push({ word:w, meaning:mean }); }
+    }
+    if (!pairs.length){ alert("Không tìm thấy định dạng hợp lệ. Dòng hợp lệ: word - meaning"); return; }
+    applyImported(pairs, {type:'paste', count:pairs.length});
+  });
+
+  el.loadSample.addEventListener("click", ()=>{
+    applyImported(mergeWords(STARTER), {type:'sample', count:STARTER.length});
+  });
+
+  document.addEventListener("keydown", (e)=>{
+    if (["1","2","3","4"].includes(e.key)){
+      const i = Number(e.key)-1;
+      const btn = el.options.querySelectorAll("button")[i];
+      if (btn) btn.click();
+    }
+  });
+
+  el.copyWrongBtn.addEventListener("click", copyWrongToClipboard);
+  el.downloadWrongBtn.addEventListener("click", downloadWrongCSV);
+  el.clearWrongBtn.addEventListener("click", ()=>{ wrongThisRound = []; renderWrongBox(); });
+
+  // Nếu fail tải XLSX → thêm cảnh báo nhỏ
+  if (typeof XLSX === "undefined" || window.__XLSX_FAIL__){
+    const note = document.createElement("div");
+    note.className = "tiny muted";
+    note.style.marginTop = "6px";
+    note.textContent = "Lưu ý: Không thể tải thư viện Excel từ CDN. Hãy bật Internet hoặc dùng CSV/TSV/TXT hoặc dán dữ liệu.";
+    el.file.parentElement.appendChild(note);
+  }
+}
+
+/* ===== Boot ===== */
+initUI();
+startNewRound(true);
+</script>
+</body>
+</html>
